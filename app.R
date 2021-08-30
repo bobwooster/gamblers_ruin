@@ -63,7 +63,7 @@ ui <- fluidPage(theme = shinytheme("cosmo"),
                         # initial fortune input
                         numericInput("initial",
                                      "Starting fortune (should be less than or equal to target fortune)",
-                                     value = 40,
+                                     value = 35,
                                      step = 1),
                         # probability of winning input
                         numericInput("w_prob",
