@@ -86,7 +86,7 @@ ui <- fluidPage(theme = shinytheme("cosmo"),
                                      width = "100%"),
                         tags$i("Reset all previous runs: this is advised if you change any simulation parameters"),
                         # reset button
-                        actionButton("reset", "Reset simulations",
+                        actionButton("reset", "Reset simulation",
                                      icon = icon("redo-alt"),
                                      width = "100%"),
                         hr(),
