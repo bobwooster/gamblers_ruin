@@ -45,7 +45,7 @@ run_sample_path <- function(start_amt,
     )
 }
 
-# Define UI for application that draws a histogram
+# Define UI for application
 ui <- fluidPage(theme = shinytheme("cosmo"),
                 
                 # Application title
@@ -265,7 +265,6 @@ server <- function(input, output, session) {
                                 ))
         }
         g <- g +
-            #theme_minimal() +
             scale_x_continuous(labels = comma) +
             scale_y_continuous(labels = comma) +
             theme(axis.text = element_text(size = 14),
@@ -304,7 +303,6 @@ server <- function(input, output, session) {
             h <- h +
                 labs(x = "Simulation length",
                      y = "Count") +
-                #theme_bw() +
                 scale_x_continuous(labels = comma) +
                 theme(strip.text.x = element_text(size = 16),
                       axis.text = element_text(size = 14),
