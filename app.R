@@ -343,7 +343,7 @@ server <- function(input, output, session) {
                                          transmute(`Expected number of plays` = scales::comma(exp_n_plays)),
                                      digits = 0, align = "c")
     # output summary run table
-    output$run_summary <- renderTable(run_table(), digits = 3)
+    output$run_summary <- renderTable(run_table(), digits = 3, align = "c")
     
     # download data
     output$download_sims <- downloadHandler(
