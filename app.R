@@ -63,21 +63,21 @@ ui <- fluidPage(theme = shinytheme("cosmo"),
                         # initial fortune input
                         numericInput("initial",
                                      "Starting fortune (should be less than or equal to target fortune)",
-                                     value = 35,
+                                     value = 25,
                                      step = 1),
                         # probability of winning input
                         numericInput("w_prob",
                                      "Probability of winning a single play",
                                      min = 0,
                                      max = 1,
-                                     value = 0.49,
+                                     value = 0.50,
                                      step = 0.001),
                         hr(),
                         tags$h3("Run the application"),
                         # run 1 button
                         tags$i("Run one simulation"),
                         actionButton("run_1", "Run 1 simulation",
-                                     icon = icon("play"),
+                                     icon = icon("step-forward"),
                                      width = "100%"),
                         # run 100 button
                         tags$i("Run 100 simulations: this can take a while if you chose a large target fortune"),
@@ -260,15 +260,18 @@ server <- function(input, output, session) {
                                 aes(
                                     x = final_play,
                                     y = final_fortune,
-                                    label = final_play
+                                    label = scales::comma(final_play,
+                                                          accuracy = 1)
                                 ))
         }
         g <- g +
             #theme_minimal() +
-            theme(axis.text = element_text(size = 16),
-                  legend.text = element_text(size = 12),
-                  legend.title=element_text(size = 14),
+            scale_x_continuous(labels = comma) +
+            scale_y_continuous(labels = comma) +
+            theme(axis.text = element_text(size = 14),
                   axis.title = element_text(size = 16),
+                  legend.text = element_text(size = 14),
+                  legend.title = element_text(size = 14),
                   legend.position = "bottom")
         
         g
@@ -302,8 +305,9 @@ server <- function(input, output, session) {
                 labs(x = "Simulation length",
                      y = "Count") +
                 #theme_bw() +
+                scale_x_continuous(labels = comma) +
                 theme(strip.text.x = element_text(size = 16),
-                      axis.text = element_text(size = 16),
+                      axis.text = element_text(size = 14),
                       axis.title = element_text(size = 16))
         }
         h
@@ -333,10 +337,11 @@ server <- function(input, output, session) {
     # output probability of going broke
     output$th_w_prob <- renderTable(theory() %>%
                                         transmute(`Probability of going broke` = prob_broke),
-                                    digits = 3)
+                                    digits = 3, align = "c")
     # output expected number of plpays
     output$th_n_plays <- renderTable(theory() %>%
-                                         transmute(`Expected number of plays` = exp_n_plays), digits = 0)
+                                         transmute(`Expected number of plays` = scales::comma(exp_n_plays)),
+                                     digits = 0, align = "c")
     # output summary run table
     output$run_summary <- renderTable(run_table(), digits = 3)
     
