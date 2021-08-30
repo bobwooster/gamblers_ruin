@@ -139,7 +139,7 @@ server <- function(input, output, session) {
     
     # initialize simulation info
     vals <- reactiveValues(simul_df = tibble(
-        run_number = 0,
+        walk = 0,
         play = 0,
         fortune = -1,
         outcome = "none"
@@ -151,7 +151,7 @@ server <- function(input, output, session) {
         new_run <- run_sample_path(start_amt = input$initial,
                                     target_amt = input$target,
                                     win_prob = input$w_prob) %>%
-            mutate(run_number = max(vals$simul_df$run_number) + 1,
+            mutate(walk = max(vals$simul_df$walk) + 1,
                    outcome = if_else(tail(fortune, n = 1) == 0,
                                      "Failure",
                                      "Success"))
@@ -163,29 +163,29 @@ server <- function(input, output, session) {
     # run 100 simulations
     observeEvent(input$run_100, {
         # compute the run numbers for the next hundred games
-        recent_run_num <- max(vals$simul_df$run_number)
-        new_run_nums <- (recent_run_num + 1):(recent_run_num + 100)
+        recent_walk <- max(vals$simul_df$walk)
+        new_walks <- (recent_walk + 1):(recent_walk + 100)
         
         # run 100 new games
-        new_runs <- map_dfr(new_run_nums,
+        new_sims <- map_dfr(new_walks,
                              ~ run_sample_path(start_amt = input$initial,
                                                target_amt = input$target,
                                                win_prob = input$w_prob) %>%
-                             mutate(run_number = .x)) %>%
-            group_by(run_number) %>%
+                             mutate(walk = .x)) %>%
+            group_by(walk) %>%
             mutate(outcome = if_else(tail(fortune, n = 1) == 0,
                                      "Failure",
                                      "Success")) %>%
             ungroup()
         
         # append the new results to the existing ones
-        vals$simul_df <- bind_rows(vals$simul_df, new_runs)
+        vals$simul_df <- bind_rows(vals$simul_df, new_sims)
     })
 
     # reset simulation info
     observeEvent(input$reset, {
         vals$simul_df <- tibble(
-            run_number = 0,
+            walk = 0,
             play = 0,
             fortune = -1,
             outcome = "none"
@@ -196,7 +196,7 @@ server <- function(input, output, session) {
     run_summary <- reactive({
         vals$simul_df %>%
             filter(outcome != "none") %>%
-            group_by(run_number) %>%
+            group_by(walk) %>%
             summarize(final_play = as.integer(tail(play, n = 1)),
                       final_fortune = as.integer(tail(fortune, n = 1)),
                       outcome = if_else(tail(fortune, n = 1) > 0,
@@ -244,13 +244,13 @@ server <- function(input, output, session) {
         
         if(input$group_outcome == TRUE) {
             g <- g +
-                geom_line(aes(col = outcome,group = run_number)) +
+                geom_line(aes(col = outcome,group = walk)) +
                 scale_color_manual(values = c(Failure = "darkred",
                                               Success = "darkgreen")) +
                 labs(x = "Plays", y = "Fortune", color = "Outcome")
         } else {
             g <- g +
-                geom_line(aes(group = run_number), col = "navy") +
+                geom_line(aes(group = walk), col = "navy") +
                 labs(x = "Plays", y = "Fortune")
         }
             
