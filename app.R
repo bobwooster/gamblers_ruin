@@ -100,23 +100,23 @@ ui <- fluidPage(theme = shinytheme("cosmo"),
                     ),
                     mainPanel(
                         fluidRow(
-                            column(width = 10,
-                                   tags$h3("Sample paths"),
+                            column(width = 9,
+                                   tags$h3("Random walk paths"),
                                    # sample paths plot
                                    plotOutput("paths_plot")),
-                            column(width = 2,
-                                   tags$h3("Theoretical expectations"),
+                            column(width = 3,
+                                   tags$h3("Theoretical values"),
                                    # theeoretical probs and # plays
                                    tableOutput("th_w_prob"),
                                    tableOutput("th_n_plays"))
                         ),
                         fluidRow(
                             column(width = 8,
-                                   tags$h3("Number of plays"),
+                                   tags$h3("Number of plays for each random walk"),
                                    # histogram of number of plays
                                    plotOutput("runs_hist")),
                             column(width = 4,
-                                   tags$h3("Summary"),
+                                   tags$h3("Summary statistics"),
                                    # summary table
                                    tableOutput("run_summary"),
                                    hr(),
