@@ -127,7 +127,7 @@ ui <- fluidPage(theme = shinytheme("cosmo"),
                                    "Created by",
                                    tags$a(href="https://bobwooster.github.io", "Bob Wooster"),
                                    br(),
-                                   tags$a(href="https://bobwooster.github.io", "Github repo for this app"))
+                                   tags$a(href="https://github.com/bobwooster/gamblers_ruin", "Github repo for this app"))
                         )
                     )
                 )
