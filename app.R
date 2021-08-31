@@ -31,106 +31,135 @@ run_sample_path <- function(start_amt,
     j <- 1
     
     # play games until gambler hits target or goes broke
-    while(current_fortune > 0 & current_fortune < target_amt) {
+    while (current_fortune > 0 & current_fortune < target_amt) {
         j <- j + 1
-        outcome <- sample(c(-1, 1), 1, prob = c(1 - win_prob, win_prob))
+        outcome <-
+            sample(c(-1, 1), 1, prob = c(1 - win_prob, win_prob))
         current_fortune <- current_fortune + outcome
         fortune[j] <- current_fortune
     }
     
     # return tibble
-    tibble(
-        play = 0:(j-1),
-        fortune = fortune
-    )
+    tibble(play = 0:(j - 1),
+           fortune = fortune)
 }
 
 # Define UI for application
-ui <- fluidPage(theme = shinytheme("cosmo"),
-                
-                # Application title
-                titlePanel("Gambler's ruin simulation"),
-                
-                # Sidebar 
-                sidebarLayout(
-                    sidebarPanel(width = 3,
-                        tags$h3("Simulation parameters"),
-                        # target fortune input
-                        numericInput("target",
-                                     "Target fortune",
-                                     value = 50,
-                                     step = 1),
-                        # initial fortune input
-                        numericInput("initial",
-                                     "Starting fortune (should be less than or equal to target fortune)",
-                                     value = 25,
-                                     step = 1),
-                        # probability of winning input
-                        numericInput("w_prob",
-                                     "Probability of winning a single play",
-                                     min = 0,
-                                     max = 1,
-                                     value = 0.50,
-                                     step = 0.001),
-                        hr(),
-                        tags$h3("Run the application"),
-                        # run 1 button
-                        tags$i("Run one simulation"),
-                        actionButton("run_1", "Run 1 simulation",
-                                     icon = icon("step-forward"),
-                                     width = "100%"),
-                        # run 100 button
-                        tags$i("Run 100 simulations: this can take a while if you chose a large target fortune"),
-                        actionButton("run_100", "Run 100 simulations",
-                                     icon = icon("forward"),
-                                     width = "100%"),
-                        tags$i("Reset all previous runs: this is advised if you change any simulation parameters"),
-                        # reset button
-                        actionButton("reset", "Reset simulation",
-                                     icon = icon("redo-alt"),
-                                     width = "100%"),
-                        hr(),
-                        tags$h3("Plot options"),
-                        # show labels
-                        checkboxInput("show_labs", "Show plot labels?",
-                                      value = TRUE, width = "100%"),
-                        # group outcome
-                        checkboxInput("group_outcome", "Group by outcome?",
-                                      value = TRUE)
-                    ),
-                    mainPanel(
-                        fluidRow(
-                            column(width = 9,
-                                   tags$h3("Random walk paths"),
-                                   # sample paths plot
-                                   plotOutput("paths_plot")),
-                            column(width = 3,
-                                   tags$h3("Theoretical values"),
-                                   # theeoretical probs and # plays
-                                   tableOutput("th_w_prob"),
-                                   tableOutput("th_n_plays"))
-                        ),
-                        fluidRow(
-                            column(width = 8,
-                                   tags$h3("Number of plays for each random walk"),
-                                   # histogram of number of plays
-                                   plotOutput("runs_hist")),
-                            column(width = 4,
-                                   tags$h3("Summary statistics"),
-                                   # summary table
-                                   tableOutput("run_summary"),
-                                   hr(),
-                                   # download simulation data
-                                   downloadButton("download_sims",
-                                                  "Download simulation data"),
-                                   hr(),
-                                   "Created by",
-                                   tags$a(href="https://bobwooster.github.io", "Bob Wooster"),
-                                   br(),
-                                   tags$a(href="https://github.com/bobwooster/gamblers_ruin", "Github repo for this app"))
-                        )
-                    )
-                )
+ui <- fluidPage(
+    theme = shinytheme("cosmo"),
+    # Application title
+    titlePanel("Gambler's ruin simulation"),
+    # Sidebar
+    sidebarLayout(
+        sidebarPanel(
+            width = 3,
+            tags$h3("Simulation parameters"),
+            # target fortune input
+            numericInput("target",
+                         "Target fortune",
+                         value = 50,
+                         step = 1),
+            # initial fortune input
+            numericInput(
+                "initial",
+                "Starting fortune (should be less than or equal to target fortune)",
+                value = 25,
+                step = 1
+            ),
+            # probability of winning input
+            numericInput(
+                "w_prob",
+                "Probability of winning a single play",
+                min = 0,
+                max = 1,
+                value = 0.50,
+                step = 0.001
+            ),
+            hr(),
+            tags$h3("Run the application"),
+            # run 1 button
+            tags$i("Run one simulation"),
+            actionButton(
+                "run_1",
+                "Run 1 simulation",
+                icon = icon("step-forward"),
+                width = "100%"
+            ),
+            # run 100 button
+            tags$i(
+                "Run 100 simulations: this can take a while if you chose a large target fortune"
+            ),
+            actionButton(
+                "run_100",
+                "Run 100 simulations",
+                icon = icon("forward"),
+                width = "100%"
+            ),
+            tags$i(
+                "Reset all previous runs: this is advised if you change any simulation parameters"
+            ),
+            # reset button
+            actionButton(
+                "reset",
+                "Reset simulation",
+                icon = icon("redo-alt"),
+                width = "100%"
+            ),
+            hr(),
+            tags$h3("Plot options"),
+            # show labels
+            checkboxInput(
+                "show_labs",
+                "Show plot labels?",
+                value = TRUE,
+                width = "100%"
+            ),
+            # group outcome
+            checkboxInput("group_outcome", "Group by outcome?",
+                          value = TRUE)
+        ),
+        mainPanel(fluidRow(
+            column(width = 9,
+                   tags$h3("Random walk paths"),
+                   # sample paths plot
+                   plotOutput("paths_plot")),
+            column(
+                width = 3,
+                tags$h3("Overview"),
+                tags$i(
+                    "On each play the gambler wins 1 or loses 1, and plays until he either reaches the target fortune or goes broke"
+                ),
+                hr(),
+                tags$h3("Theoretical values"),
+                # theoretical probs and # plays
+                tableOutput("th_w_prob"),
+                tableOutput("th_n_plays")
+            )
+        ),
+        fluidRow(
+            column(
+                width = 8,
+                tags$h3("Number of plays for each random walk"),
+                # histogram of number of plays
+                plotOutput("runs_hist")
+            ),
+            column(
+                width = 4,
+                tags$h3("Summary statistics"),
+                # summary table
+                tableOutput("run_summary"),
+                hr(),
+                # download simulation data
+                downloadButton("download_sims",
+                               "Download simulation data"),
+                hr(),
+                "Created by",
+                tags$a(href = "https://bobwooster.github.io", "Bob Wooster"),
+                br(),
+                tags$a(href = "https://github.com/bobwooster/gamblers_ruin", "Github repo for this app")
+            )
+        ))
+    )
 )
 
 # server function
@@ -240,17 +269,17 @@ server <- function(input, output, session) {
                     y = fortune
                 )
             ) +
-            geom_hline(yintercept = c(0, isolate(input$target)), col = c("darkred", "black"))
+            geom_hline(yintercept = c(0, isolate(input$target)), col = c("red4", "gray30"))
         
         if(input$group_outcome == TRUE) {
             g <- g +
                 geom_line(aes(col = outcome,group = walk)) +
-                scale_color_manual(values = c(Failure = "darkred",
-                                              Success = "darkgreen")) +
+                scale_color_manual(values = c(Failure = "red4",
+                                              Success = "gray30")) +
                 labs(x = "Plays", y = "Fortune", color = "Outcome")
         } else {
             g <- g +
-                geom_line(aes(group = walk), col = "navy") +
+                geom_line(aes(group = walk), col = "royalblue4") +
                 labs(x = "Plays", y = "Fortune")
         }
             
@@ -292,12 +321,12 @@ server <- function(input, output, session) {
                                         col = "black",
                                         bins = 30) +
                     facet_grid(cols = vars(outcome)) +
-                    scale_fill_manual(values = c(Failure = "darkred",
-                                                 Success = "darkgreen")) +
+                    scale_fill_manual(values = c(Failure = "red4",
+                                                 Success = "gray30")) +
                     guides(fill = "none")
             } else {
                 h <- h + geom_histogram(col = "black",
-                                        fill = "goldenrod",
+                                        fill = "royalblue4",
                                         bins = 30)
             }
             h <- h +
