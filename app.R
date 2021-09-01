@@ -10,7 +10,9 @@
 
 # load packages
 library(shiny)
+library(shinyvalidate)
 library(shinythemes)
+library(waiter)
 library(tidyverse)
 library(scales)
 
@@ -46,7 +48,15 @@ run_sample_path <- function(start_amt,
 
 # Define UI for application
 ui <- fluidPage(
+    # set theme
     theme = shinytheme("cosmo"),
+    
+    # progress bar for running 100 walks
+    waiter::use_waitress(),
+    
+    # use feedback
+    shinyFeedback::useShinyFeedback(),
+    
     # Application title
     titlePanel("Gambler's ruin simulation"),
     # Sidebar
@@ -55,14 +65,18 @@ ui <- fluidPage(
             width = 3,
             tags$h3("Simulation parameters"),
             # target fortune input
-            numericInput("target",
-                         "Target fortune",
-                         value = 50,
-                         step = 1),
+            numericInput(
+                "target",
+                "Target fortune",
+                min = 0,
+                value = 50,
+                step = 1
+            ),
             # initial fortune input
             numericInput(
                 "initial",
-                "Starting fortune (should be less than or equal to target fortune)",
+                "Starting fortune",
+                min = 0,
                 value = 25,
                 step = 1
             ),
@@ -78,26 +92,23 @@ ui <- fluidPage(
             hr(),
             tags$h3("Run the application"),
             # run 1 button
-            tags$i("Run one simulation"),
             actionButton(
                 "run_1",
-                "Run 1 simulation",
+                "Run 1 random walk",
                 icon = icon("step-forward"),
                 width = "100%"
             ),
             # run 100 button
-            tags$i(
-                "Run 100 simulations: this can take a while if you chose a large target fortune"
-            ),
+            br(),
+            br(),
             actionButton(
                 "run_100",
-                "Run 100 simulations",
+                "Run 100 random walks",
                 icon = icon("forward"),
                 width = "100%"
             ),
-            tags$i(
-                "Reset all previous runs: this is advised if you change any simulation parameters"
-            ),
+            br(),
+            br(),
             # reset button
             actionButton(
                 "reset",
@@ -106,17 +117,19 @@ ui <- fluidPage(
                 width = "100%"
             ),
             hr(),
-            tags$h3("Plot options"),
+            tags$h3("Options"),
+            # group outcome
+            checkboxInput("group_outcome",
+                          "Group by outcome?",
+                          value = TRUE,
+                          width = "100%"),
             # show labels
             checkboxInput(
                 "show_labs",
                 "Show plot labels?",
                 value = TRUE,
                 width = "100%"
-            ),
-            # group outcome
-            checkboxInput("group_outcome", "Group by outcome?",
-                          value = TRUE)
+            )
         ),
         mainPanel(fluidRow(
             column(width = 9,
@@ -166,24 +179,52 @@ ui <- fluidPage(
 server <- function(input, output, session) {
     thematic::thematic_shiny()
     
+    # set up rules for invalid inputs
+    iv <- InputValidator$new()
+    iv$add_rule("w_prob", sv_between(0, 1))
+    iv$add_rule("target", compose_rules(sv_integer(), sv_gt(0)))
+    iv$add_rule("initial", compose_rules(sv_integer(), sv_gte(0)))
+    iv$enable()
+    
     # initialize simulation info
     vals <- reactiveValues(simul_df = tibble(
         walk = 0,
         play = 0,
         fortune = -1,
-        outcome = "none"
+        outcome = "none",
     ))
+    
+    # check to see if initial fortune exceeds target
+    observe({
+        shinyFeedback::feedback("initial",
+                                input$target < input$initial,
+                                "Must not exceed target",
+                                color = "red")
+        
+        shinyFeedback::feedbackWarning(
+            "target",
+            input$target > 150,
+            "Large target values can lengthen computation and plot rendering time"
+        )
+    })
     
     # run 1 simulation
     observeEvent(input$run_1, {
+        # check to see if inputs are valid before continuing
+        req(iv$is_valid(), input$initial <= input$target)
+        
         # run the new game
-        new_run <- run_sample_path(start_amt = input$initial,
-                                    target_amt = input$target,
-                                    win_prob = input$w_prob) %>%
-            mutate(walk = max(vals$simul_df$walk) + 1,
-                   outcome = if_else(tail(fortune, n = 1) == 0,
-                                     "Failure",
-                                     "Success"))
+        new_run <- run_sample_path(
+            start_amt = input$initial,
+            target_amt = input$target,
+            win_prob = input$w_prob
+        ) %>%
+            mutate(
+                walk = max(vals$simul_df$walk) + 1,
+                outcome = if_else(tail(fortune, n = 1) == 0,
+                                  "Failure",
+                                  "Success")
+            )
         
         # append the new run onto the existing ones
         vals$simul_df <- bind_rows(vals$simul_df, new_run)
@@ -191,16 +232,36 @@ server <- function(input, output, session) {
     
     # run 100 simulations
     observeEvent(input$run_100, {
+        # check to see if inputs are valid before continuing
+        req(iv$is_valid(), input$initial <= input$target)
+        
         # compute the run numbers for the next hundred games
         recent_walk <- max(vals$simul_df$walk)
         new_walks <- (recent_walk + 1):(recent_walk + 100)
         
+        # create a new progress bar
+        waitress <- waiter::Waitress$new(selector = "#run_100",
+                                         theme = "overlay-percent")
+        # automatically close it when done
+        on.exit(waitress$close())
+        
+        # function to use in map, increments status and
+        # runs next random walk
+        my_func <- function(x){
+            # increment status bar
+            waitress$inc(1)
+            # run random walk
+            run_sample_path(
+                start_amt = input$initial,
+                target_amt = input$target,
+                win_prob = input$w_prob
+            ) %>%
+                # label walk number
+                mutate(walk = x)}
+        
         # run 100 new games
         new_sims <- map_dfr(new_walks,
-                             ~ run_sample_path(start_amt = input$initial,
-                                               target_amt = input$target,
-                                               win_prob = input$w_prob) %>%
-                             mutate(walk = .x)) %>%
+                            ~ my_func(.x)) %>%
             group_by(walk) %>%
             mutate(outcome = if_else(tail(fortune, n = 1) == 0,
                                      "Failure",
@@ -210,7 +271,7 @@ server <- function(input, output, session) {
         # append the new results to the existing ones
         vals$simul_df <- bind_rows(vals$simul_df, new_sims)
     })
-
+    
     # reset simulation info
     observeEvent(input$reset, {
         vals$simul_df <- tibble(
@@ -226,12 +287,14 @@ server <- function(input, output, session) {
         vals$simul_df %>%
             filter(outcome != "none") %>%
             group_by(walk) %>%
-            summarize(final_play = as.integer(tail(play, n = 1)),
-                      final_fortune = as.integer(tail(fortune, n = 1)),
-                      outcome = if_else(tail(fortune, n = 1) > 0,
-                                        "Success",
-                                        "Failure"),
-                      .groups = "drop")
+            summarize(
+                final_play = as.integer(tail(play, n = 1)),
+                final_fortune = as.integer(tail(fortune, n = 1)),
+                outcome = if_else(tail(fortune, n = 1) > 0,
+                                  "Success",
+                                  "Failure"),
+                .groups = "drop"
+            )
     })
     
     # table of run history
@@ -244,8 +307,12 @@ server <- function(input, output, session) {
                 summarize(
                     n = n(),
                     Prop = n / nrow(df),
-                    `Mean plays` = scales::comma(as.integer(round(mean(final_play)))),
-                    `SD plays` =  scales::comma(as.integer(round(sd(final_play)))),
+                    `Mean plays` = scales::comma(as.integer(round(
+                        mean(final_play)
+                    ))),
+                    `SD plays` =  scales::comma(as.integer(round(
+                        sd(final_play)
+                    ))),
                     .groups = "drop"
                 )
         } else {
@@ -253,54 +320,61 @@ server <- function(input, output, session) {
                 summarize(
                     n = n(),
                     `Win prob` = mean(outcome == "Success"),
-                    `Mean plays` = scales::comma(as.integer(round(mean(final_play)))),
-                    `SD plays` = scales::comma(as.integer(round(sd(final_play))))
+                    `Mean plays` = scales::comma(as.integer(round(
+                        mean(final_play)
+                    ))),
+                    `SD plays` = scales::comma(as.integer(round(
+                        sd(final_play)
+                    )))
                 )
         }
     })
     
-    # sample paths  plot
+    # sample paths plot
     output$paths_plot <- renderPlot({
         g <- vals$simul_df %>%
             filter(outcome != "none") %>%
-            ggplot(
-                aes(
-                    x = play,
-                    y = fortune
-                )
-            ) +
-            geom_hline(yintercept = c(0, isolate(input$target)), col = c("red4", "gray30"))
+            ggplot(aes(x = play,
+                       y = fortune)) +
+            geom_hline(yintercept = c(0, isolate(input$target)),
+                       col = c("red4", "gray30"))
         
-        if(input$group_outcome == TRUE) {
+        if (input$group_outcome == TRUE) {
             g <- g +
-                geom_line(aes(col = outcome,group = walk)) +
+                geom_line(aes(col = outcome, group = walk)) +
                 scale_color_manual(values = c(Failure = "red4",
                                               Success = "gray30")) +
-                labs(x = "Plays", y = "Fortune", color = "Outcome")
+                labs(x = "Plays",
+                     y = "Fortune",
+                     color = "Outcome")
         } else {
             g <- g +
                 geom_line(aes(group = walk), col = "royalblue4") +
                 labs(x = "Plays", y = "Fortune")
         }
-            
-        if(input$show_labs == TRUE) {
-            g <- g + geom_label(inherit.aes = FALSE,
-                                data = run_summary(),
-                                aes(
-                                    x = final_play,
-                                    y = final_fortune,
-                                    label = scales::comma(final_play,
-                                                          accuracy = 1)
-                                ))
+        
+        if (input$show_labs == TRUE) {
+            g <- g + geom_label(
+                inherit.aes = FALSE,
+                data = run_summary(),
+                aes(
+                    x = final_play,
+                    y = final_fortune,
+                    label = scales::comma(final_play,
+                                          accuracy = 1)
+                )
+            )
         }
         g <- g +
-            scale_x_continuous(labels = comma) +
-            scale_y_continuous(labels = comma) +
-            theme(axis.text = element_text(size = 14),
-                  axis.title = element_text(size = 16),
-                  legend.text = element_text(size = 14),
-                  legend.title = element_text(size = 14),
-                  legend.position = "bottom")
+            scale_x_continuous(label = scales::label_comma(accuracy = 1)) +
+            scale_y_continuous(label = scales::label_comma(accuracy = 1)) +
+            theme(
+                axis.text = element_text(size = 14),
+                axis.title = element_text(size = 16),
+                legend.text = element_text(size = 14),
+                legend.title = element_text(size = 14),
+                legend.position = "bottom"
+            )
         
         g
     })
@@ -309,14 +383,14 @@ server <- function(input, output, session) {
     output$runs_hist <- renderPlot(height = 300, {
         df <- run_summary()
         
-        if(nrow(df) == 0){
+        if (nrow(df) == 0) {
             h <- ggplot() + theme_void()
         } else {
             df <- run_summary()
             
             h <- df %>%
                 ggplot(aes(x = final_play))
-            if(input$group_outcome == TRUE) {
+            if (input$group_outcome == TRUE) {
                 h <- h + geom_histogram(aes(fill = outcome),
                                         col = "black",
                                         bins = 30) +
@@ -332,45 +406,58 @@ server <- function(input, output, session) {
             h <- h +
                 labs(x = "Simulation length",
                      y = "Count") +
-                scale_x_continuous(labels = comma) +
-                theme(strip.text.x = element_text(size = 16),
-                      axis.text = element_text(size = 14),
-                      axis.title = element_text(size = 16))
+                scale_x_continuous(label = scales::label_comma(accuracy = 1)) +
+                scale_y_continuous(label = scales::label_comma(accuracy = 1)) +
+                theme(
+                    strip.text.x = element_text(size = 16),
+                    axis.text = element_text(size = 14),
+                    axis.title = element_text(size = 16)
+                )
         }
         h
     })
     
     # compute theoretical probabilities and expected number of runs
     theory <- reactive({
+        # check to see if inputs are valid before continuing
+        req(iv$is_valid(), input$initial <= input$target)
+        
         a <- input$initial    # starting fortune
         b <- input$target     # target fortune
         p <- input$w_prob   # prob of winning
         q <- 1 - p
-        odds <- p/q
-        if(p == 0.5) {
+        odds <- p / q
+        if (p == 0.5) {
             pbroke <- (b - a) / b
-            n_plays <- a*(b - a)
-        } else if(p != 0){
-            pbroke <- (1 - exp((b-a)*log(odds))) / (1 - exp(b*log(odds)))
-            n_plays <- (b *(1 - pbroke) - a) / (p - q)
+            n_plays <- a * (b - a)
+        } else if (p != 1) {
+            pbroke <- (1 - exp((b - a) * log(odds))) / (1 - exp(b * log(odds)))
+            n_plays <- (b * (1 - pbroke) - a) / (p - q)
         } else {
-            pbroke <- 1
-            n_plays <- a
+            pbroke <- 0
+            n_plays <- b - a
         }
         tibble(prob_broke = pbroke,
                exp_n_plays = n_plays)
     })
     
     # output probability of going broke
-    output$th_w_prob <- renderTable(theory() %>%
-                                        transmute(`Probability of going broke` = prob_broke),
-                                    digits = 3, align = "c")
+    output$th_w_prob <- renderTable(
+        theory() %>%
+            transmute(`Probability of going broke` = prob_broke),
+        digits = 3,
+        align = "c"
+    )
     # output expected number of plpays
-    output$th_n_plays <- renderTable(theory() %>%
-                                         transmute(`Expected number of plays` = scales::comma(exp_n_plays)),
-                                     digits = 0, align = "c")
+    output$th_n_plays <- renderTable(
+        theory() %>%
+            transmute(`Expected number of plays` = scales::comma(exp_n_plays)),
+        digits = 0,
+        align = "c"
+    )
     # output summary run table
-    output$run_summary <- renderTable(run_table(), digits = 3, align = "c")
+    output$run_summary <-
+        renderTable(run_table(), digits = 3, align = "c")
     
     # download data
     output$download_sims <- downloadHandler(
@@ -386,6 +473,5 @@ server <- function(input, output, session) {
     )
 }
 
-# Run the application 
+# Run the application
 shinyApp(ui = ui, server = server)
-
